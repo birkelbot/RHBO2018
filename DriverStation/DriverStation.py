@@ -7,15 +7,19 @@ import serial
 import array
 import sys
 import math
+import bluetooth
 
 # To check what serial ports are available in Linux, use the bash command: dmesg | grep tty
 # To check what serial ports are available in Windows, use the cmd command: wmic path Win32_SerialPort
 comPort = 'COM3'
 
-def main():
+# Bluetooth settings
+bluetooth_target_name = "FILL THIS IN!"
+bluetooth_target_address = None
 
-    # Initialize the serial port
-    ser = serial.Serial(comPort, 57600, timeout=1)
+def main():
+    # Initialize bluetooth.
+    socket = connectBluetooth()
     #os.environ["SDL_VIDEODRIVER"] = "dummy"
 
     # Initialize the gamepad
@@ -64,10 +68,10 @@ def main():
                 time.time()*1000 > prevTimeSent + 200):
 
                 print("Sending... L: ", driveMtrCmds['left'], ", R: ", driveMtrCmds['right'], ", A: ", armCmd)
-                ser.write(chr(255))  # Start byte
-                ser.write(chr(driveMtrCmds['left']))
-                ser.write(chr(driveMtrCmds['right']))
-                ser.write(chr(armCmd))
+                socket.send(chr(255))  # Start byte
+                socket.send(chr(driveMtrCmds['left']))
+                socket.send(chr(driveMtrCmds['right']))
+                socket.send(chr(armCmd))
 
                 prevdriveMtrCmds = driveMtrCmds
                 prevArmCmd = armCmd
@@ -86,8 +90,8 @@ def main():
 def arcadeDrive(yIn, rIn):
     
     # Set output command range constants
-    zeroCommand = int(127)  # the default value that corresponds to no motor power
-    cmdRange = int(127)     # the maximum amount (+/-) that the command can vary from the zero command
+    zeroCommand = int(0)  # the default value that corresponds to no motor power
+    cmdRange = int(255)     # the maximum amount (+/-) that the command can vary from the zero command
     maxCommand = cmdRange
     minCommand = -cmdRange
 
@@ -227,25 +231,38 @@ def armDrive(aIn):
 
 
 ############################################################
+## @brief Connect to the bot via bluetooth.
+############################################################
+def connectBluetooth():
+    nearby_devices = bluetooth.discover_devices()
+
+    for address in nearby_devices:
+        if bluetooth_target_name == bluetooth.lookup_name(address):
+            bluetooth_target_address = address
+            break
+
+    if bluetooth_target_address is None:
+        print "Could not find target bluetooth device nearby."
+        exit()
+
+    print "Found target bluetooth device with address ", bluetooth_target_address
+    port = 1
+    sock=bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    sock.connect((bluetooth_target_address, port))
+    return sock
+
+
+############################################################
 ## @brief Zero all the commands to the robot and exit
 ############################################################
-def cleanup():
-
-    print("Cleaning up and exiting")
-    ser = serial.Serial(comPort, 57600, timeout=1)
-    ser.write(b'\xFF')
-    ser.write(b'\x00')
-    ser.write(b'\x00')
-    ser.write(b'\x00')
-    ser.write(b'\x00')
-
-    # ser.write(startByte.to_bytes(1, byteorder='big'))
-    # ser.write(b'\x00')
-    # ser.write(b'\x00')
-    # ser.write(b'\x00')
-    # ser.write(b'\x00')
-    # ser.write(b'\x00\x00')
-    ser.close()
+def cleanup(socket):
+    print("Cleaning up and exiting...")
+    socket.send(b'\xFF')
+    socket.send(b'\x00')
+    socket.send(b'\x00')
+    socket.send(b'\x00')
+    socket.send(b'\x00')
+    socket.close()
     exit() 
 
 
