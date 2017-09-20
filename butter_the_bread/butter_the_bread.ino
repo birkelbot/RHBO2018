@@ -17,7 +17,7 @@ MeDCMotor right_motor(M2);
 MePort servo_port(PORT_1);
 Servo arm_servo;
 
-void setuarm_servop() {
+void setup() {
   // Setup.
   bluetooth.begin(115200);    //The factory default baud rate is 115200
   arm_servo.attach(servo_port.pin1());
