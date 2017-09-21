@@ -8,8 +8,6 @@
 #define MAX_MS_NO_COMMS 250
 
 #define LED_BUILTIN 13
-#define ARM_POS_LOW 0
-#define ARM_POS_HIGH 180
 
 // Motors
 MeDCMotor left_motor(M1);
@@ -53,13 +51,7 @@ void loop() {
 
   setMotorSpeed(left_motor_speed, &left_motor);
   setMotorSpeed(right_motor_speed, &right_motor);
-
-  // Arm is only moved on -100 or 100; stays fixed if 100.
-  if (arm_pos == -100) {
-    arm_servo.write(ARM_POS_LOW);
-  } else if (arm_pos == 100) {
-    arm_servo.write(ARM_POS_HIGH);
-  }
+  arm_servo.write(arm_pos);
 
   checkComms();
 }
