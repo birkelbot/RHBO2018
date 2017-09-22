@@ -11,6 +11,7 @@ import math
 # To check what serial ports are available in Linux, use the bash command: dmesg | grep tty
 # To check what serial ports are available in Windows, use the cmd command: wmic path Win32_SerialPort
 comPort = '/dev/rfcomm0'
+joystickNum = 1
 
 def main():
 
@@ -38,9 +39,9 @@ def main():
             pygame.event.pump() # This line is needed to process the gamepad packets
 
             # Get the raw values for drive translation/rotation and arm using the gamepad
-            yRaw = joysticks[0].get_axis(1)  # Y-axis translation comes from the left joystick Y axis
-            rRaw = -joysticks[0].get_axis(4) # Rotation comes from the right joystick X axis
-            aRaw = -joysticks[0].get_axis(2) # Raising/lowering the arm comes from the analog triggers
+            yRaw = joysticks[joystickNum].get_axis(1)  # Y-axis translation comes from the left joystick Y axis
+            rRaw = -joysticks[joystickNum].get_axis(2) # Rotation comes from the right joystick X axis
+            # aRaw = -joysticks[0].get_axis(2) # Raising/lowering the arm comes from the analog triggers
 
             # Get the drive motor commands for Arcade Drive
             driveMtrCmds = arcadeDrive(yRaw, rRaw)
@@ -49,13 +50,12 @@ def main():
             armCmd = 0 # armDrive(aRaw)
             
             # Allow the bumpers to control the arm, overriding the analog triggers
-            armUpBtn = joysticks[0].get_button(4)
-            armDownBtn = joysticks[0]. get_button(5)
+            armUpBtn = joysticks[joystickNum].get_button(4) or joysticks[joystickNum].get_button(5)
             # btnCmd = int(50)
-            if (armDownBtn):
-                armCmd = 100
-            elif (armUpBtn):
-                armCmd = -100
+            if (armUpBtn):
+                armCmd = 110
+            else:
+                armCmd = 180
 
             # Only send if the commands changed or if 200ms have elapsed
             if (prevdriveMtrCmds['left'] != driveMtrCmds['left'] or
@@ -66,7 +66,7 @@ def main():
                 print("Sending... L: ", driveMtrCmds['left'], ", R: ", driveMtrCmds['right'], ", A: ", armCmd)
                 ser.write(chr(255))  # Start byte
                 ser.write(chr(driveMtrCmds['left']))
-                ser.write(chr(driveMtrCmds['right']))
+                ser.write(chr(254-driveMtrCmds['right']))
                 ser.write(chr(armCmd))
 
                 prevdriveMtrCmds = driveMtrCmds
@@ -86,8 +86,8 @@ def main():
 def arcadeDrive(yIn, rIn):
     
     # Set output command range constants
-    zeroCommand = int(0)  # the default value that corresponds to no motor power
-    cmdRange = int(255)     # the maximum amount (+/-) that the command can vary from the zero command
+    zeroCommand = int(127)  # the default value that corresponds to no motor power
+    cmdRange = int(127)     # the maximum amount (+/-) that the command can vary from the zero command
     maxCommand = cmdRange
     minCommand = -cmdRange
 
@@ -98,7 +98,7 @@ def arcadeDrive(yIn, rIn):
     yEndpoint = 127  # maximum/minumum (+/-) for the Y-axis translation
 
     rExpConst = 1.5  # exponential growth coefficient of the rotation -- should be between 1.0-4.0
-    rEndpoint = 50   # maximum/minimum (+/-) for the rotation
+    rEndpoint = 127  # maximum/minimum (+/-) for the rotation
 
     # Set a deadband for the raw joystick input
     deadband = 0.10
@@ -234,8 +234,8 @@ def cleanup():
     print("Cleaning up and exiting")
     ser = serial.Serial(comPort, 57600, timeout=1)
     ser.write(b'\xFF')
-    ser.write(b'\x00')
-    ser.write(b'\x00')
+    ser.write(chr(127))
+    ser.write(chr(127))
     ser.write(b'\x00')
     ser.close()
     exit() 
