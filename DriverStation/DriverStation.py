@@ -10,18 +10,17 @@ import math
 
 # To check what serial ports are available in Linux, use the bash command: dmesg | grep tty
 # To check what serial ports are available in Windows, use the cmd command: wmic path Win32_SerialPort
-comPort = '/dev/rfcomm0'
+comPort = 'COM3'
 joystickNum = 1
 
-joystickYdrive = 1
-joystickRDrive = 2
-joystickArm = 4
-joystickArmOverride = 3 # Analog trigger
-joystickClaw = 5
-joystickClawOverride = 4 # Analog trigger
-joystickBed = 6 # TODO: Figure out the `A` button number
+joystickYDrive = 3
+joystickRDrive = 0
+joystickArm = 5
+joystickClaw = 4
+joystickAnalogTrigger = 2
+joystickBed = 0
 
-analogTriggerMin = 5 # Value below this are treated as `0`.
+deadband = 0.10 # Deadband for the analog joystick.
 
 ###############################################################
 ###############################################################
@@ -69,7 +68,7 @@ def main():
             pygame.event.pump() # This line is needed to process the gamepad packets
 
             # Get the raw values for drive translation/rotation and arm using the gamepad
-            yRaw = joysticks[joystickNum].get_axis(joystickYdrive)  # Y-axis translation comes from the left joystick Y axis
+            yRaw = joysticks[joystickNum].get_axis(joystickYDrive)  # Y-axis translation comes from the left joystick Y axis
             rRaw = -joysticks[joystickNum].get_axis(joystickRDrive) # Rotation comes from the right joystick X axis
             # aRaw = -joysticks[0].get_axis(2) # Raising/lowering the arm comes from the analog triggers
 
@@ -81,23 +80,22 @@ def main():
             
             # Get arm, claw and bed commands
             armUpBtn = joysticks[joystickNum].get_button(joystickArm)
-            armOverrideRaw = joysticks[joystickNum].get_axis(joystickArmOverride)
             clawCloseBtn = joysticks[joystickNum].get_button(joystickClaw)
-            clawOverrideRaw = joysticks[joystickNum].get_axis(joystickClawOverride)
-            bedDumpBtn = joysticks[joystickNum].get_button(joystickClaw)
+            analogTriggerRaw = joysticks[joystickNum].get_axis(joystickAnalogTrigger)
+            bedDumpBtn = joysticks[joystickNum].get_button(joystickBed)
 
             # Arm
-            if (armOverrideRaw >= analogTriggerMin)
+            if (-analogTriggerRaw >= deadband):  # Arm trigger side is a negative number.
                 armCmd = armMed
-            if (armUpBtn):
+            elif (armUpBtn):
                 armCmd = armHigh
             else:
                 armCmd = armLow
 
             # Claw
-            if (clawOverrideRaw >= analogTriggerMin)
+            if (analogTriggerRaw >= deadband):
                 clawCmd = clawMed
-            if (clawCloseBtn):
+            elif (clawCloseBtn):
                 clawCmd = clawClosed
             else:
                 clawCmd = clawOpen
@@ -111,7 +109,7 @@ def main():
             # Only send if the commands changed or if 200ms have elapsed
             if (prevdriveMtrCmds['left'] != driveMtrCmds['left'] or
                 prevdriveMtrCmds['right'] != driveMtrCmds['right'] or
-                prevArmCmd != armCmd or prevClawCmd != clawCmd or prevBedCmd != bedCmd
+                prevArmCmd != armCmd or prevClawCmd != clawCmd or prevBedCmd != bedCmd or
                 time.time()*1000 > prevTimeSent + 200):
 
                 print("Sending... L: ", driveMtrCmds['left'], ", R: ", driveMtrCmds['right'], ", A: ", armCmd, ", C: ", clawCmd, ", B: ", bedCmd)
@@ -156,7 +154,7 @@ def arcadeDrive(yIn, rIn):
     rEndpoint = 127  # maximum/minimum (+/-) for the rotation
 
     # Set a deadband for the raw joystick input
-    deadband = 0.10
+
 
     # Set a base command (within the command range above) to overcome gearbox resistance at low drive speeds
     leftMtrBaseCmd = int(2)
@@ -243,9 +241,6 @@ def armDrive(aIn):
 
     expConst = 1.5  # exponential growth coefficient of the Y-axis translation -- should be between 1.0-4.0
     endpoint = 127  # maximum/minumum (+/-) for the Y-axis translation
-
-    # Set a deadband for the raw joystick input
-    deadband = 0.0
 
     # Set a base command (within the command range above) to overcome gearbox resistance at low drive speeds
     baseCmd = int(5)
