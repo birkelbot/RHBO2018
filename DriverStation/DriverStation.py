@@ -13,6 +13,34 @@ import math
 comPort = '/dev/rfcomm0'
 joystickNum = 1
 
+joystickYdrive = 1
+joystickRDrive = 2
+joystickArm = 4
+joystickArmOverride = 3 # Analog trigger
+joystickClaw = 5
+joystickClawOverride = 4 # Analog trigger
+joystickBed = 6 # TODO: Figure out the `A` button number
+
+analogTriggerMin = 5 # Value below this are treated as `0`.
+
+###############################################################
+###############################################################
+###############################################################
+# Servo settings
+armLow = 110
+armMed = 150
+armHigh = 180
+
+clawOpen = 180
+clawMed = 150
+clawClosed = 110
+
+bedDown = 110
+bedDump = 180
+###############################################################
+###############################################################
+###############################################################
+
 def main():
 
     # Initialize the serial port
@@ -30,6 +58,8 @@ def main():
     # Local variables
     prevdriveMtrCmds = {'left':0, 'right':0}
     prevArmCmd = 0
+    prevClawCmd = 0
+    prevBedCmd = 0
     prevTimeSent = 0
     done = False
 
@@ -39,38 +69,63 @@ def main():
             pygame.event.pump() # This line is needed to process the gamepad packets
 
             # Get the raw values for drive translation/rotation and arm using the gamepad
-            yRaw = joysticks[joystickNum].get_axis(1)  # Y-axis translation comes from the left joystick Y axis
-            rRaw = -joysticks[joystickNum].get_axis(2) # Rotation comes from the right joystick X axis
+            yRaw = joysticks[joystickNum].get_axis(joystickYdrive)  # Y-axis translation comes from the left joystick Y axis
+            rRaw = -joysticks[joystickNum].get_axis(joystickRDrive) # Rotation comes from the right joystick X axis
             # aRaw = -joysticks[0].get_axis(2) # Raising/lowering the arm comes from the analog triggers
 
             # Get the drive motor commands for Arcade Drive
             driveMtrCmds = arcadeDrive(yRaw, rRaw)
 
             # Get the arm motor command
-            armCmd = 0 # armDrive(aRaw)
+            armCmd = 0
             
-            # Allow the bumpers to control the arm, overriding the analog triggers
-            armUpBtn = joysticks[joystickNum].get_button(4) or joysticks[joystickNum].get_button(5)
-            # btnCmd = int(50)
+            # Get arm, claw and bed commands
+            armUpBtn = joysticks[joystickNum].get_button(joystickArm)
+            armOverrideRaw = joysticks[joystickNum].get_axis(joystickArmOverride)
+            clawCloseBtn = joysticks[joystickNum].get_button(joystickClaw)
+            clawOverrideRaw = joysticks[joystickNum].get_axis(joystickClawOverride)
+            bedDumpBtn = joysticks[joystickNum].get_button(joystickClaw)
+
+            # Arm
+            if (armOverrideRaw >= analogTriggerMin)
+                armCmd = armMed
             if (armUpBtn):
-                armCmd = 110
+                armCmd = armHigh
             else:
-                armCmd = 180
+                armCmd = armLow
+
+            # Claw
+            if (clawOverrideRaw >= analogTriggerMin)
+                clawCmd = clawMed
+            if (clawCloseBtn):
+                clawCmd = clawClosed
+            else:
+                clawCmd = clawOpen
+
+            # Bed
+            if (bedDumpBtn):
+                bedCmd = bedDump
+            else:
+                bedCmd = bedDown
 
             # Only send if the commands changed or if 200ms have elapsed
             if (prevdriveMtrCmds['left'] != driveMtrCmds['left'] or
                 prevdriveMtrCmds['right'] != driveMtrCmds['right'] or
-                prevArmCmd != armCmd or
+                prevArmCmd != armCmd or prevClawCmd != clawCmd or prevBedCmd != bedCmd
                 time.time()*1000 > prevTimeSent + 200):
 
-                print("Sending... L: ", driveMtrCmds['left'], ", R: ", driveMtrCmds['right'], ", A: ", armCmd)
+                print("Sending... L: ", driveMtrCmds['left'], ", R: ", driveMtrCmds['right'], ", A: ", armCmd, ", C: ", clawCmd, ", B: ", bedCmd)
                 ser.write(chr(255))  # Start byte
                 ser.write(chr(driveMtrCmds['left']))
                 ser.write(chr(254-driveMtrCmds['right']))
                 ser.write(chr(armCmd))
+                ser.write(chr(clawCmd))
+                ser.write(chr(bedCmd))
 
                 prevdriveMtrCmds = driveMtrCmds
                 prevArmCmd = armCmd
+                prevClawCmd = clawCmd
+                prevBedCmd = bedCmd
                 prevTimeSent = time.time()*1000
                 time.sleep(.05)
     except KeyboardInterrupt:
