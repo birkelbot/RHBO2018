@@ -10,41 +10,24 @@ import math
 
 # To check what serial ports are available in Linux, use the bash command: dmesg | grep tty
 # To check what serial ports are available in Windows, use the cmd command: wmic path Win32_SerialPort
-comPort = 'COM3'
-joystickNum = 1
+comPort = '/dev/rfcomm0'
+joystickNum = 0
 
-joystickYDrive = 3
-joystickRDrive = 0
-joystickArm = 5
-joystickClaw = 4
-joystickAnalogTrigger = 2
+joystickYDrive = 1
+joystickRDrive = 3
+joystickArm = 4
+joystickClaw = 5
+joystickAnalogTriggerArm = 2
+joystickAnalogTriggerClaw = 5
 joystickBed = 0
+joystickHorn = 1
 
 deadband = 0.10 # Deadband for the analog joystick.
-
-###############################################################
-###############################################################
-###############################################################
-# Servo settings
-armLow = 110
-armMed = 150
-armHigh = 180
-
-clawOpen = 180
-clawMed = 150
-clawClosed = 110
-
-bedDown = 110
-bedDump = 180
-###############################################################
-###############################################################
-###############################################################
 
 def main():
 
     # Initialize the serial port
     ser = serial.Serial(comPort, 57600, timeout=1)
-    #os.environ["SDL_VIDEODRIVER"] = "dummy"
 
     # Initialize the gamepad
     pygame.init()
@@ -68,57 +51,62 @@ def main():
             pygame.event.pump() # This line is needed to process the gamepad packets
 
             # Get the raw values for drive translation/rotation and arm using the gamepad
-            yRaw = joysticks[joystickNum].get_axis(joystickYDrive)  # Y-axis translation comes from the left joystick Y axis
+            yRaw = -joysticks[joystickNum].get_axis(joystickYDrive)  # Y-axis translation comes from the left joystick Y axis
             rRaw = -joysticks[joystickNum].get_axis(joystickRDrive) # Rotation comes from the right joystick X axis
-            # aRaw = -joysticks[0].get_axis(2) # Raising/lowering the arm comes from the analog triggers
 
             # Get the drive motor commands for Arcade Drive
             driveMtrCmds = arcadeDrive(yRaw, rRaw)
 
             # Get the arm motor command
             armCmd = 0
+            clawCmd = 0
+            bedCmd = 0
             
             # Get arm, claw and bed commands
             armUpBtn = joysticks[joystickNum].get_button(joystickArm)
             clawCloseBtn = joysticks[joystickNum].get_button(joystickClaw)
-            analogTriggerRaw = joysticks[joystickNum].get_axis(joystickAnalogTrigger)
+            analogTriggerRawArm = joysticks[joystickNum].get_axis(joystickAnalogTriggerArm)
+            analogTriggerRawClaw = joysticks[joystickNum].get_axis(joystickAnalogTriggerClaw)
             bedDumpBtn = joysticks[joystickNum].get_button(joystickBed)
+            hornBtn = joysticks[joystickNum].get_button(joystickHorn)
 
             # Arm
-            if (-analogTriggerRaw >= deadband):  # Arm trigger side is a negative number.
-                armCmd = armMed
+            if (analogTriggerRawArm + 1 >= deadband):
+                armCmd = 1 # armMed
             elif (armUpBtn):
-                armCmd = armHigh
+                armCmd = 2 # armHigh
             else:
-                armCmd = armLow
+                armCmd = 0 #armLow
 
             # Claw
-            if (analogTriggerRaw >= deadband):
-                clawCmd = clawMed
+            if (analogTriggerRawClaw + 1 >= deadband):
+                clawCmd = 1 # clawMed
             elif (clawCloseBtn):
-                clawCmd = clawClosed
+                clawCmd = 0 # clawClosed
             else:
-                clawCmd = clawOpen
+                clawCmd = 2 # clawOpen
 
             # Bed
             if (bedDumpBtn):
-                bedCmd = bedDump
+                bedCmd = 1 # bedDump
             else:
-                bedCmd = bedDown
+                bedCmd = 0 # bedDown
+
+            # Assemble the bitwise command
+            bitwiseCmd = armCmd | clawCmd << 2 | bedCmd << 4 | hornBtn << 5
 
             # Only send if the commands changed or if 200ms have elapsed
-            if (prevdriveMtrCmds['left'] != driveMtrCmds['left'] or
-                prevdriveMtrCmds['right'] != driveMtrCmds['right'] or
-                prevArmCmd != armCmd or prevClawCmd != clawCmd or prevBedCmd != bedCmd or
-                time.time()*1000 > prevTimeSent + 200):
+            # if (prevdriveMtrCmds['left'] != driveMtrCmds['left'] or
+            #     prevdriveMtrCmds['right'] != driveMtrCmds['right'] or
+            #     prevArmCmd != armCmd or prevClawCmd != clawCmd or prevBedCmd != bedCmd or
+            #     time.time()*1000 > prevTimeSent + 200):
+            if (time.time()*1000 > prevTimeSent + 200):
 
                 print("Sending... L: ", driveMtrCmds['left'], ", R: ", driveMtrCmds['right'], ", A: ", armCmd, ", C: ", clawCmd, ", B: ", bedCmd)
                 ser.write(chr(255))  # Start byte
                 ser.write(chr(driveMtrCmds['left']))
                 ser.write(chr(254-driveMtrCmds['right']))
-                ser.write(chr(armCmd))
-                ser.write(chr(clawCmd))
-                ser.write(chr(bedCmd))
+                ser.write(chr(bitwiseCmd))
 
                 prevdriveMtrCmds = driveMtrCmds
                 prevArmCmd = armCmd
