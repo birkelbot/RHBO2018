@@ -10,7 +10,7 @@ import math
 
 # To check what serial ports are available in Linux, use the bash command: dmesg | grep tty
 # To check what serial ports are available in Windows, use the cmd command: wmic path Win32_SerialPort
-comPort = '/dev/rfcomm0'
+comPort = 'COM4'
 joystickNum = 0
 
 joystickYDrive = 1
