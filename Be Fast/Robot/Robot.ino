@@ -14,7 +14,7 @@ MeDCMotor left_motor(M1);
 MeDCMotor right_motor(M2);
 
 void setup() {
-  Serial.begin(115200);    // The factory default baud rate is 115200
+  Serial.begin(115200);    // The baud rate for Bluetooth LE is 115200
 
   // Give a few blinks to show that the code is up and running.
   blink(3);
@@ -48,6 +48,7 @@ void tryReadComms() {
   int right_motor_speed = Serial.read();
 
   setMotorSpeed(left_motor_speed, &left_motor);
+  setMotorSpeed(right_motor_speed, &right_motor);
 }
 
 void checkComms() {

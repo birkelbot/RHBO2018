@@ -11,17 +11,17 @@ import math
 # To check what serial ports are available in Linux, use the bash command: dmesg | grep tty
 # To check what serial ports are available in Windows, use the cmd command: wmic path Win32_SerialPort
 comPort = 'COM4'
-joystickNum = 0
+baudRate = 115200 # Bluetooth LE runs on 115200
 
+joystickNum = 0
 joystickYDrive = 1
 joystickRDrive = 3
-
 deadband = 0.10 # Deadband for the analog joystick.
 
 def main():
 
     # Initialize the serial port
-    ser = serial.Serial(comPort, 57600, timeout=1)
+    ser = serial.Serial(comPort, baudRate, timeout=1)
 
     # Initialize the gamepad
     pygame.init()
@@ -57,9 +57,6 @@ def main():
                 ser.write(chr(254-driveMtrCmds['right']))
 
                 prevdriveMtrCmds = driveMtrCmds
-                prevArmCmd = armCmd
-                prevClawCmd = clawCmd
-                prevBedCmd = bedCmd
                 prevTimeSent = time.time()*1000
                 time.sleep(.05)
     except KeyboardInterrupt:
